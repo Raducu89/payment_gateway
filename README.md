@@ -28,3 +28,5 @@ PHPMyAdmin: http://localhost:8080 u/p - root/root
 Testing: To run the tests, execute the following command inside the "app" container: php artisan test
 
 These steps should allow anyone who received the test to build, run, and test the application using Docker.
+
+Use attached Postman collection for manual testing :)
