@@ -18,8 +18,6 @@ return new class extends Migration
             $table->enum('status', ['pending', 'paid', 'failed'])->default('pending');
             $table->json('response_data')->nullable();
             $table->timestamps();
-
-            $table->foreign('order_id')->references('id')->on('orders')->onDelete('cascade');
         });
     }
 
