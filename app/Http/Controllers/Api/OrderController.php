@@ -7,10 +7,8 @@ use App\Http\Resources\OrderResource;
 use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
-use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use App\Enums\PaymentStatus;
 
 class OrderController extends Controller
 {
@@ -23,16 +21,7 @@ class OrderController extends Controller
 
     public function store(StoreOrderRequest $request): JsonResponse
     {
-        $order = $this->orderService->createOrder([
-            'user_id' => $request->user()->id,
-            'amount' => $request->validated()['amount'],
-            'status' => PaymentStatus::Pending,
-        ]);
-
-        $order->transaction()->create([
-            'payment_provider' => $request->validated()['payment_provider'],
-            'status' => PaymentStatus::Pending,
-        ]);
+        $order = $this->orderService->createOrder($request->validated());
 
         return response()->json([
             'message' => 'Order created successfully.',
@@ -42,23 +31,24 @@ class OrderController extends Controller
 
     public function show($id): OrderResource|JsonResponse
     {   
-        Gate::authorize('view', Order::find($id));
-
+        
         $order = $this->orderService->getOrder($id);
-
+        
         if (!$order) {
             return response()->json(['message' => 'Order not found'], 404);
         }
 
+        Gate::authorize('view', $order);
+
         return new OrderResource($order);
     }
 
-    public function list(Request $request): JsonResponse  // ToDo: implement OrderResource,pagination
+    public function list(Request $request): JsonResponse 
     {
         $orders = $this->orderService->getOrders($request->user()->id);
         
         return response()->json([
-            'data' => $orders
+            'data' => OrderResource::collection($orders)
         ]);
     }
 }

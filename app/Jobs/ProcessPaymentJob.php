@@ -14,6 +14,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use App\Enums\PaymentStatus;
 
 class ProcessPaymentJob implements ShouldQueue
 {
@@ -25,7 +27,7 @@ class ProcessPaymentJob implements ShouldQueue
     public int $tries = 3;
 
     // Set the number of seconds the job should wait before retrying
-    public int $backoff = 10;
+    public array $backoff = [10, 30, 60];
 
     /**
      * Create a new job instance.
@@ -43,20 +45,44 @@ class ProcessPaymentJob implements ShouldQueue
      * @param OrderRepository $orderRepo
      * @param TransactionRepository $transactionRepo
      */
-    public function handle(OrderRepository $orderRepo, TransactionRepository $transactionRepo)
-    {
-        // Retrieve the provider key from the order's transaction data
-        $providerKey = $this->order->transaction->payment_provider;
-
-        // Use the factory to create the appropriate provider instance
-        $paymentProvider = PaymentProviderFactory::make($providerKey);
-
-        // Create a new PaymentService instance and process the payment
-        $paymentService = new PaymentService($paymentProvider, $orderRepo, $transactionRepo);
-        
+    public function handle(OrderRepository $orderRepo, TransactionRepository $transactionRepo): void
+    {      
         try {
+            DB::beginTransaction();
+
+            // Retrieve the provider key from the order's transaction data
+            $transaction = $this->order->transaction;
+            $providerKey = $transaction->payment_provider;
+    
+            // Use the factory to create the appropriate provider instance
+            $paymentProvider = PaymentProviderFactory::make($providerKey);
+    
+            // Create a new PaymentService instance and process the payment
+            $paymentService = new PaymentService($paymentProvider, $orderRepo, $transactionRepo);
+
             $paymentService->processPayment($this->order);
-        } catch (Exception $e) {
+
+            DB::commit();
+
+            Log::info('Payment processed successfully', [
+                'order_id' => $this->order->id,
+                'transaction_id' => $transaction->id,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            if (isset($transaction)) {
+                $transactionRepo->updateStatus($transaction, PaymentStatus::Failed->value);
+            }
+
+            $this->order->update(['status' => PaymentStatus::Failed->value]);
+
+            Log::error('Payment processing failed', [
+                'order_id' => $this->order->id,
+                'error' => $e->getMessage(),
+                'code' => $e->getCode(),
+            ]);
+
             throw $e;
         }
     }
@@ -64,20 +90,15 @@ class ProcessPaymentJob implements ShouldQueue
     /**
      * The job failed to process.
      *
-     * @param Exception $exception
+     * @param \Throwable $e
+     * @return void
      */
-    public function failed(Exception $e)
+    public function failed(\Throwable $e)
     {
-        $transaction = $this->order->transaction;
-        if ($transaction) {
-            $transaction->update([
-                'status'        => 'failed',
-                'response_data' => ['error' => $e->getMessage()],
-            ]);
-        }
-
-        Log::error('ProcessPaymentJob failed for order ' . $this->order->id, [
-            'exception' => $e->getMessage()
+        Log::error('ProcessPaymentJob failed hard', [
+            'order_id' => $this->order->id,
+            'error' => $e->getMessage(),
+            'attempts' => $this->attempts(),
         ]);
     }
 }

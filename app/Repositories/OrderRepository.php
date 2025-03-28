@@ -22,9 +22,9 @@ class OrderRepository
         return $order;
     }
 
-    public function listOrders(): array
+    public function listOrders(): \Illuminate\Database\Eloquent\Collection
     {
-        return Order::orderBy('created_at', 'desc')->with('transaction')->limit(10)->get()->toArray();
+        return Order::orderBy('created_at', 'desc')->with('transaction')->limit(10)->get();
     }
     
 }

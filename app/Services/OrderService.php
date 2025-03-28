@@ -7,9 +7,7 @@ use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Repositories\OrderRepository;
-use Illuminate\Database\Eloquent\Collection;
 use App\Enums\PaymentStatus;
-use Faker\Provider\ar_EG\Payment;
 
 class OrderService
 {   
@@ -31,11 +29,18 @@ class OrderService
     {
         // Wrap order creation in a DB transaction for data integrity.
         return DB::transaction(function () use ($data) {
-            return $this->orderRepository->create([
+            $order = $this->orderRepository->create([
                 'user_id' => Auth::id(),
                 'amount'  => $data['amount'],
                 'status'  => PaymentStatus::Pending->value,
             ]);
+
+            $order->transaction()->create([
+                'payment_provider' => $data['payment_provider'],
+                'status' => PaymentStatus::Pending,
+            ]);
+
+            return $order;
         });
     }
 
@@ -56,7 +61,7 @@ class OrderService
      *
      * @return Order[]
      */
-    public function getOrders(int $userId): array
+    public function getOrders(int $userId): \Illuminate\Database\Eloquent\Collection
     {
         return $this->orderRepository->listOrders($userId);
     }

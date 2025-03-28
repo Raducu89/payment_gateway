@@ -5,14 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\PayTransactionRequest;
 use App\Repositories\OrderRepository;
 use App\Repositories\TransactionRepository;
-use App\Services\Payment\PayPalPaymentProvider; 
-use App\Services\Payment\StripePaymentProvider;
 use App\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Enums\PaymentStatus;
-use Faker\Provider\ar_EG\Payment;
+use App\Jobs\ProcessPaymentJob;
 
 class TransactionController extends Controller
 {
@@ -35,7 +32,7 @@ class TransactionController extends Controller
      * @param  int  $orderId
      * @return JsonResponse
      */
-    public function pay(Request $request, $orderId): JsonResponse //temporary removed PayTransactionRequest $request
+    public function pay($orderId): JsonResponse 
     {
         // Retrieve the order from the repository.
         $order = $this->orderRepository->findById($orderId);
@@ -43,12 +40,12 @@ class TransactionController extends Controller
             return response()->json(['message' => 'Order not found'], 404);
         }
 
-        if($order->status !== PaymentStatus::Pending->value) {
+        if (PaymentStatus::from($order->status) !== PaymentStatus::Pending) {
             return response()->json(['message' => 'Order is not pending'], 400);
         }   
 
         // Dispatch a job to process the payment asynchronously.
-        \App\Jobs\ProcessPaymentJob::dispatch($order);
+        ProcessPaymentJob::dispatch($order);
 
         return response()->json([
             'message' => 'Payment processing initiated.',

@@ -37,7 +37,7 @@ class PaymentService
 
         
         try {
-            $paymentResult = $this->paymentProvider->pay($order);
+            $paymentResult = $this->paymentProvider->processPayment($order, [$transaction->payment_details]);
         } catch (Exception $e) {
             Log::error("Payment processing error for order {$order->id}: " . $e->getMessage());
 

@@ -16,17 +16,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {        
-        // $this->app->bind(\App\Services\Payment\PaymentProviderInterface::class, function ($app) {
-        //     $defaultProvider = config('payment.default_provider'); 
-        //     $providers = config('payment.providers'); 
-        //     $providerClass = $providers[$defaultProvider] ?? $providers['stripe'];
-            
-        //     if (!class_exists($providerClass)) {
-        //         throw new \Exception("Clasa provider '$providerClass' nu există.");
-        //     }
-            
-        //     return new $providerClass;
-        // });
+        //
     }
 
     /**
